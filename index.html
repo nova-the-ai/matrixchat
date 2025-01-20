@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Matrix Chat</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #1f1c2c, #928dab);
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        #container {
+            width: 90%;
+            max-width: 500px;
+            padding: 20px;
+            border-radius: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.5);
+            text-align: center;
+        }
+        #roomOptions, #chat {
+            display: none;
+        }
+        button {
+            margin: 10px;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            background: #6a3093;
+            color: white;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background: #a044ff;
+        }
+        input {
+            margin: 10px;
+            padding: 10px;
+            width: 80%;
+            border-radius: 5px;
+            border: none;
+            font-size: 16px;
+        }
+        ul {
+            list-style: none;
+            padding: 0;
+            max-height: 300px;
+            overflow-y: auto;
+            margin: 10px 0;
+        }
+        li {
+            margin: 5px;
+            padding: 10px;
+            border-radius: 5px;
+            max-width: 70%;
+        }
+        .host-message {
+            background: #6a3093;
+            color: white;
+            margin-left: auto;
+            text-align: right;
+        }
+        .user-message {
+            background: #a044ff;
+            color: white;
+            margin-right: auto;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <h1>Matrix Chat</h1>
+        <div id="mainMenu">
+            <button onclick="showHost()">Host Room</button>
+            <button onclick="showJoin()">Join Room</button>
+        </div>
+
+        <div id="roomOptions">
+            <h2 id="roomHeader"></h2>
+            <input id="roomCodeInput" placeholder="Enter Room Code" />
+            <button onclick="joinRoom()">Join</button>
+        </div>
+
+        <div id="chat">
+            <h2>Room Code: <span id="currentRoomCode"></span></h2>
+            <ul id="messages"></ul>
+            <form onsubmit="sendMessage(event)">
+                <input id="messageInput" placeholder="Type a message..." />
+                <button type="submit">Send</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let currentRoomCode;
+        let isHost = false;
+
+        function showHost() {
+            document.getElementById('mainMenu').style.display = 'none';
+            document.getElementById('roomOptions').style.display = 'block';
+            document.getElementById('roomHeader').textContent = 'Hosting Room...';
+            socket.emit('host room');
+            isHost = true;
+            socket.on('room created', (roomCode) => {
+                currentRoomCode = roomCode;
+                document.getElementById('roomHeader').textContent = `Room Code: ${roomCode}`;
+                document.getElementById('roomCodeInput').value = roomCode;
+            });
+        }
+
+        function showJoin() {
+            document.getElementById('mainMenu').style.display = 'none';
+            document.getElementById('roomOptions').style.display = 'block';
+            document.getElementById('roomHeader').textContent = 'Join Room';
+        }
+
+        function joinRoom() {
+            const roomCode = document.getElementById('roomCodeInput').value;
+            if (roomCode) {
+                socket.emit('join room', roomCode);
+                socket.on('room joined', (room) => {
+                    currentRoomCode = room;
+                    document.getElementById('roomOptions').style.display = 'none';
+                    document.getElementById('chat').style.display = 'block';
+                    document.getElementById('currentRoomCode').textContent = room;
+                });
+
+                socket.on('room error', (error) => {
+                    alert(error);
+                });
+            }
+        }
+
+        function sendMessage(event) {
+            event.preventDefault();
+            const message = document.getElementById('messageInput').value;
+            if (message) {
+                socket.emit('chat message', currentRoomCode, {
+                    sender: isHost ? 'host' : 'user',
+                    text: message,
+                });
+                document.getElementById('messageInput').value = '';
+            }
+        }
+
+        socket.on('chat message', (msg) => {
+            const li = document.createElement('li');
+            li.textContent = msg.text;
+            if (msg.sender === 'host') {
+                li.className = isHost ? 'host-message' : 'user-message';
+            } else {
+                li.className = isHost ? 'user-message' : 'host-message';
+            }
+            document.getElementById('messages').appendChild(li);
+        });
+    </script>
+</body>
+</html>
